@@ -1,0 +1,35 @@
+{
+  "name": "wix-elevenlabs-ingest",
+  "version": "1.0.0",
+  "description": "WIX to ElevenLabs lead ingest endpoint system",
+  "main": "server.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cojovi/cmac_penny_autocall.git"
+  },
+  "homepage": "https://github.com/cojovi/cmac_penny_autocall#readme",
+  "bugs": {
+    "url": "https://github.com/cojovi/cmac_penny_autocall/issues"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch server.ts",
+    "start": "node dist/server.js",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^4.18.2",
+    "ioredis": "^5.3.2",
+    "libphonenumber-js": "^1.10.44"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.14",
+    "@types/express": "^4.17.18",
+    "@types/node": "^20.8.0",
+    "tsx": "^3.14.0",
+    "typescript": "^5.2.2"
+  },
+  "type": "module"
+}
