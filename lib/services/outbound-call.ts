@@ -78,39 +78,45 @@ export class OutboundCallService {
         };
       }
 
+      const firstName = (leadData.first_name || '').trim();
+      const lastName = (leadData.last_name || '').trim();
+      const dynamicVariables = {
+        // Required variables for first message template
+        honorific: firstName ? 'Mr.' : '', // Only use honorific if we have a name
+        request_type: (leadData.request_type || 'roofing inquiry').trim(),
+        source_site: (leadData.source_site || 'our website').trim(),
+        agent_name: 'Penny',
+        last_name: lastName,
+        last_name_suffix: (leadData.last_name_suffix || '').trim(),
+
+        // Lead information
+        lead_full_name: (leadData.lead_full_name || `${firstName} ${lastName}`).trim(),
+        first_name: firstName,
+        lead_phone: leadData.lead_phone || '',
+        address_line1: leadData.address_line1 || '',
+        city: leadData.city || '',
+        state: leadData.state || '',
+        zip: leadData.zip || '',
+        notes: leadData.notes || '',
+        location: leadData.location || '',
+
+        // System tracking
+        wix_submission_id: leadData.wix_submission_id || '',
+        wix_contact_id: leadData.wix_contact_id || '',
+
+        // Default values for agent workflow
+        status: leadData.status || 'new_lead',
+        preferred_callback_time: leadData.preferred_callback_time || 'now',
+        consent_to_call_now: leadData.consent_to_call_now ?? true
+      };
+
       const callPayload = {
         agent_id: this.agentId,
         agent_phone_number_id: phoneNumberId,
         to_number: leadData.lead_phone,
-        // Provide all required dynamic variables for the ElevenLabs agent
         conversation_initiation_client_data: {
-          // Required variables for first message template
-          honorific: leadData.first_name ? 'Mr.' : '', // Only use honorific if we have a name
-          request_type: leadData.request_type || 'roofing inquiry',
-          source_site: 'our website',
-          agent_name: 'Penny',
-          last_name: leadData.last_name ? ` ${leadData.last_name}` : '',
-          last_name_suffix: leadData.last_name_suffix || '',
-
-          // Lead information
-          lead_full_name: leadData.lead_full_name || '',
-          first_name: leadData.first_name || '',
-          lead_phone: leadData.lead_phone || '',
-          address_line1: leadData.address_line1 || '',
-          city: leadData.city || '',
-          state: leadData.state || '',
-          zip: leadData.zip || '',
-          notes: leadData.notes || '',
-          location: leadData.location || '',
-
-          // System tracking
-          wix_submission_id: leadData.wix_submission_id || '',
-          wix_contact_id: leadData.wix_contact_id || '',
-
-          // Default values for agent workflow
-          status: 'new_lead',
-          preferred_callback_time: 'now',
-          consent_to_call_now: true
+          type: 'conversation_initiation_client_data',
+          dynamic_variables: dynamicVariables
         }
       };
 
@@ -123,7 +129,8 @@ export class OutboundCallService {
         phoneNumberId: phoneNumberId,
         targetPhone: leadData.lead_phone
       });
-      console.log('📋 Dynamic variables being sent:', JSON.stringify(callPayload.conversation_initiation_client_data, null, 2));
+      console.log('📋 Dynamic variables being sent:', JSON.stringify(dynamicVariables, null, 2));
+      console.log('📦 ElevenLabs payload body:', JSON.stringify(callPayload, null, 2));
 
       const response = await fetch(apiUrl, {
         method: 'POST',

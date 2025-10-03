@@ -3,6 +3,7 @@ import Redis from 'ioredis';
 export interface LeadData {
   first_name: string;
   last_name: string;
+  last_name_suffix?: string;
   lead_full_name: string;
   lead_phone: string;
   address_line1: string;
@@ -15,6 +16,9 @@ export interface LeadData {
   source_site: string;
   wix_submission_id: string;
   wix_contact_id: string;
+  status?: string;
+  preferred_callback_time?: string;
+  consent_to_call_now?: boolean;
 }
 
 class Store {
