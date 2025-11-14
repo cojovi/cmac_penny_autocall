@@ -80,6 +80,7 @@ export class OutboundCallService {
 
       const firstName = (leadData.first_name || '').trim();
       const lastName = (leadData.last_name || '').trim();
+      
       const dynamicVariables = {
         // Required variables for first message template
         honorific: firstName ? 'Mr.' : '', // Only use honorific if we have a name
@@ -93,6 +94,7 @@ export class OutboundCallService {
         lead_full_name: (leadData.lead_full_name || `${firstName} ${lastName}`).trim(),
         first_name: firstName,
         lead_phone: leadData.lead_phone || '',
+        customer_address: (leadData.address_line1 || '').trim(), // Map to address_line1 for ElevenLabs agent
         address_line1: leadData.address_line1 || '',
         city: leadData.city || '',
         state: leadData.state || '',

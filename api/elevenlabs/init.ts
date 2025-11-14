@@ -64,12 +64,50 @@ export async function handleElevenLabsInit(req: Request, res: Response): Promise
         name: leadData.lead_full_name
       });
 
-      // Return the flat JSON for ElevenLabs variable binding
-      res.status(200).json(leadData);
+      // Transform LeadData to match the dynamic_variables structure used in outbound calls
+      // This ensures consistency whether data comes from webhook fetch or direct call payload
+      const firstName = (leadData.first_name || '').trim();
+      const lastName = (leadData.last_name || '').trim();
+      
+      const dynamicVariables = {
+        // Required variables for first message template
+        honorific: firstName ? 'Mr.' : '', // Only use honorific if we have a name
+        request_type: (leadData.request_type || 'roofing inquiry').trim(),
+        source_site: (leadData.source_site || 'our website').trim(),
+        agent_name: 'Penny',
+        last_name: lastName,
+        last_name_suffix: (leadData.last_name_suffix || '').trim(),
+
+        // Lead information
+        lead_full_name: (leadData.lead_full_name || `${firstName} ${lastName}`).trim(),
+        first_name: firstName,
+        lead_phone: leadData.lead_phone || '',
+        customer_address: (leadData.address_line1 || '').trim(), // Map to address_line1 for ElevenLabs agent
+        address_line1: leadData.address_line1 || '',
+        city: leadData.city || '',
+        state: leadData.state || '',
+        zip: leadData.zip || '',
+        notes: leadData.notes || '',
+        location: leadData.location || '',
+
+        // System tracking
+        wix_submission_id: leadData.wix_submission_id || '',
+        wix_contact_id: leadData.wix_contact_id || '',
+
+        // Default values for agent workflow
+        status: leadData.status || 'new_lead',
+        preferred_callback_time: leadData.preferred_callback_time || 'now',
+        consent_to_call_now: leadData.consent_to_call_now ?? true
+      };
+
+      console.log('📋 Returning dynamic variables to ElevenLabs:', JSON.stringify(dynamicVariables, null, 2));
+
+      // Return the same structure as outbound call dynamic_variables
+      res.status(200).json(dynamicVariables);
       return;
     }
 
-    // No lead data found - return safe defaults
+    // No lead data found - return safe defaults with required structure
     console.log('No lead data found, returning defaults:', {
       phoneKey,
       submissionKey,
@@ -77,20 +115,27 @@ export async function handleElevenLabsInit(req: Request, res: Response): Promise
     });
 
     const defaults = {
-      first_name: '',
+      honorific: '',
+      request_type: 'General Inquiry',
+      source_site: 'unknown',
+      agent_name: 'Penny',
       last_name: '',
+      last_name_suffix: '',
       lead_full_name: '',
+      first_name: '',
       lead_phone: phoneE164 || '',
+      customer_address: '',
       address_line1: '',
       city: '',
       state: '',
       zip: '',
       notes: '',
-      request_type: 'General Inquiry',
       location: '',
-      source_site: 'unknown',
       wix_submission_id: '',
-      wix_contact_id: ''
+      wix_contact_id: '',
+      status: 'new_lead',
+      preferred_callback_time: 'now',
+      consent_to_call_now: true
     };
 
     res.status(200).json(defaults);
@@ -105,22 +150,29 @@ export async function handleElevenLabsInit(req: Request, res: Response): Promise
     });
 
     // NEVER return error status - this would block the call
-    // Always return 200 with safe defaults
+    // Always return 200 with safe defaults matching dynamic_variables structure
     const safeDefaults = {
-      first_name: '',
+      honorific: '',
+      request_type: 'General Inquiry',
+      source_site: 'error_fallback',
+      agent_name: 'Penny',
       last_name: '',
+      last_name_suffix: '',
       lead_full_name: '',
+      first_name: '',
       lead_phone: '',
+      customer_address: '',
       address_line1: '',
       city: '',
       state: '',
       zip: '',
       notes: '',
-      request_type: 'General Inquiry',
       location: '',
-      source_site: 'error_fallback',
       wix_submission_id: '',
-      wix_contact_id: ''
+      wix_contact_id: '',
+      status: 'new_lead',
+      preferred_callback_time: 'now',
+      consent_to_call_now: true
     };
 
     res.status(200).json(safeDefaults);
