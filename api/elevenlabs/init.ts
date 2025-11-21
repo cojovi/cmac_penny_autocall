@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { store } from '../../lib/store.js';
-import { toE164 } from '../../lib/normalize.js';
+import { toE164, stripUSPrefix } from '../../lib/normalize.js';
 
 interface ElevenLabsRequest {
   from?: string;
@@ -81,7 +81,7 @@ export async function handleElevenLabsInit(req: Request, res: Response): Promise
         // Lead information
         lead_full_name: (leadData.lead_full_name || `${firstName} ${lastName}`).trim(),
         first_name: firstName,
-        lead_phone: leadData.lead_phone || '',
+        lead_phone: stripUSPrefix(leadData.lead_phone || ''),
         customer_address: (leadData.address_line1 || '').trim(), // Map to address_line1 for ElevenLabs agent
         address_line1: leadData.address_line1 || '',
         city: leadData.city || '',
@@ -123,7 +123,7 @@ export async function handleElevenLabsInit(req: Request, res: Response): Promise
       last_name_suffix: '',
       lead_full_name: '',
       first_name: '',
-      lead_phone: phoneE164 || '',
+      lead_phone: stripUSPrefix(phoneE164 || ''),
       customer_address: '',
       address_line1: '',
       city: '',

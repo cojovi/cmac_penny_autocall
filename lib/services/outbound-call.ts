@@ -1,4 +1,5 @@
 import { LeadData } from '../store.js';
+import { stripUSPrefix } from '../normalize.js';
 
 interface ElevenLabsCallResponse {
   call_id?: string;
@@ -93,7 +94,7 @@ export class OutboundCallService {
         // Lead information
         lead_full_name: (leadData.lead_full_name || `${firstName} ${lastName}`).trim(),
         first_name: firstName,
-        lead_phone: leadData.lead_phone || '',
+        lead_phone: stripUSPrefix(leadData.lead_phone || ''),
         customer_address: (leadData.address_line1 || '').trim(), // Map to address_line1 for ElevenLabs agent
         address_line1: leadData.address_line1 || '',
         city: leadData.city || '',
@@ -115,7 +116,7 @@ export class OutboundCallService {
       const callPayload = {
         agent_id: this.agentId,
         agent_phone_number_id: phoneNumberId,
-        to_number: leadData.lead_phone,
+        to_number: stripUSPrefix(leadData.lead_phone),
         conversation_initiation_client_data: {
           type: 'conversation_initiation_client_data',
           dynamic_variables: dynamicVariables

@@ -5,6 +5,7 @@ import { handleWixWebhook } from './api/webhooks/wix.js';
 import { handleElevenLabsInit } from './api/elevenlabs/init.js';
 import { testCallConfiguration } from './api/test/call-config.js';
 import { phoneImportService } from './lib/services/phone-import.js';
+import { store } from './lib/store.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -88,20 +89,110 @@ app.post('/api/elevenlabs/post-call', async (req, res) => {
     // Path: payload.data.conversation_initiation_client_data.dynamic_variables
     const dynamicVars = payload?.data?.conversation_initiation_client_data?.dynamic_variables || {};
     
-    // Extract relevant data from dynamic variables
+    // Extract call analysis/summary if available
+    const analysis = payload?.data?.analysis || {};
+    const callSummaryTitle = analysis?.call_summary_title || '';
+    const transcriptSummary = analysis?.transcript_summary || '';
+    const callSummary = callSummaryTitle || transcriptSummary || '';
+    
+    // Try to get updated values from analysis results or updated dynamic variables
+    // The analysis might contain extracted entities or updated values
+    const analysisResults = analysis?.results || {};
+    const extractedEntities = analysis?.extracted_entities || {};
+    const dataCollectionResults = analysis?.data_collection_results || {};
+    
+    // Extract relevant data from dynamic variables (initial values)
     const {
       lead_full_name,
       first_name,
       last_name,
       lead_phone,
       customer_address,
-      preferred_callback_time,
-      consent_to_call_now,
+      preferred_callback_time: initialCallbackTime,
+      consent_to_call_now: initialConsent,
       wix_submission_id,
       wix_contact_id,
       request_type,
       notes
     } = dynamicVars;
+    
+    // Retrieve stored lead data to get email (from original WIX submission)
+    let leadEmail = '';
+    if (wix_submission_id) {
+      try {
+        const submissionKey = `sub:${wix_submission_id}`;
+        const storedLeadData = await store.getLeadData('', submissionKey);
+        if (storedLeadData?.lead_email) {
+          leadEmail = storedLeadData.lead_email;
+        }
+      } catch (error) {
+        console.warn('Failed to retrieve stored lead data for email:', error);
+      }
+    }
+    
+    // Log analysis structure for debugging
+    if (Object.keys(analysis).length > 0) {
+      console.log('📊 Analysis data found:', JSON.stringify(analysis, null, 2));
+    }
+    
+    // Check if call_summary_title indicates "Do Not Call" scenarios
+    // Examples: "Incorrect Form Submission", "Not Interested", "Do Not Call", etc.
+    const doNotCallIndicators = [
+      'incorrect form submission',
+      'not interested',
+      'do not call',
+      'wrong number',
+      'no interest',
+      'declined',
+      'refused'
+    ];
+    
+    const shouldNotCall = callSummaryTitle && 
+      doNotCallIndicators.some(indicator => 
+        callSummaryTitle.toLowerCase().includes(indicator)
+      );
+    
+    // Log extracted values for debugging
+    console.log('🔍 Extracted values check:', {
+      hasAnalysis: Object.keys(analysis).length > 0,
+      callSummaryTitle,
+      hasTranscriptSummary: !!transcriptSummary,
+      extractedEntities: Object.keys(extractedEntities).length > 0,
+      analysisResults: Object.keys(analysisResults).length > 0,
+      dataCollectionResults: Object.keys(dataCollectionResults).length > 0,
+      shouldNotCall,
+      initialCallbackTime,
+      initialConsent
+    });
+
+    // Determine follow-up values based on call_summary_title or collected data
+    let actualCallbackTime: string;
+    let consentDisplay: string;
+    
+    if (shouldNotCall) {
+      // If call summary indicates "Do Not Call", set both to "Do Not Call"
+      actualCallbackTime = 'Do Not Call';
+      consentDisplay = 'Do Not Call';
+    } else {
+      // Try to get actual collected values from analysis or updated dynamic variables
+      // Check data_collection_results first, then extracted_entities, then analysisResults
+      actualCallbackTime = dataCollectionResults?.preferred_callback_time || 
+                          extractedEntities?.preferred_callback_time || 
+                          analysisResults?.preferred_callback_time || 
+                          (initialCallbackTime === 'now' ? 'Not collected' : initialCallbackTime);
+      
+      const actualConsent = dataCollectionResults?.consent_to_call_now !== undefined ?
+                            dataCollectionResults?.consent_to_call_now :
+                            (extractedEntities?.consent_to_call_now !== undefined ? 
+                             extractedEntities?.consent_to_call_now :
+                             (analysisResults?.consent_to_call_now !== undefined ?
+                              analysisResults?.consent_to_call_now :
+                              (initialConsent === true ? null : initialConsent))); // null means we don't know the actual value
+      
+      // Format consent display - if we got null, it means we're using the initial default and should show "Not collected"
+      consentDisplay = actualConsent === null ? 'Not collected' : 
+                      (actualConsent === true ? 'Yes' : 'No');
+    }
 
     // Extract call metadata from the correct paths
     const conversationId = payload?.data?.conversation_id || 'N/A';
@@ -121,21 +212,22 @@ app.post('/api/elevenlabs/post-call', async (req, res) => {
 *Lead Information:*
 • Name: ${name || 'N/A'}
 • Phone: ${lead_phone || 'N/A'}
+• Email: ${leadEmail || 'N/A'}
 • Address: ${customer_address || 'N/A'}
 
-*Call Details:*
-• Conversation ID: ${conversationId || 'N/A'}
-• Status: ${callStatus || 'N/A'}
-• Duration: ${duration || 'N/A'}
-• Request Type: ${request_type || 'N/A'}
+${callSummaryTitle || transcriptSummary ? `*Call Summary:*${callSummaryTitle ? `\n• Title: ${callSummaryTitle}` : ''}${transcriptSummary ? `\n• Summary: ${transcriptSummary.trim()}` : ''}` : ''}
 
 *Follow-up:*
-• Preferred Callback Time: ${preferred_callback_time || 'N/A'}
-• Consent to Call Now: ${consent_to_call_now ? 'Yes' : 'No'}
+• Preferred Callback Time: ${actualCallbackTime || 'Not collected'}
+• Consent to Call Now: ${consentDisplay}
 
 *Tracking:*
 • WIX Submission ID: ${wix_submission_id || 'N/A'}
 • WIX Contact ID: ${wix_contact_id || 'N/A'}
+• Conversation ID: ${conversationId || 'N/A'}
+• Status: ${callStatus || 'N/A'}
+• Duration: ${duration || 'N/A'}
+• Request Type: ${request_type || 'N/A'}
 
 ${notes ? `*Notes:*\n${notes}` : ''}
     `.trim();

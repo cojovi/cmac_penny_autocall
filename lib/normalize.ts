@@ -68,6 +68,17 @@ export function toE164(phone: string, defaultCountry = 'US'): string {
   }
 }
 
+export function stripUSPrefix(phone: string): string {
+  if (!phone) return '';
+  
+  // Remove +1 prefix if present (US/Canada country code)
+  if (phone.startsWith('+1')) {
+    return phone.substring(2);
+  }
+  
+  return phone;
+}
+
 export function sanitizeNotes(text: string): string {
   if (!text) return '';
 
@@ -350,6 +361,46 @@ export function extractPhone(wixData: WixSubmission): string {
   return '';
 }
 
+export function extractEmail(wixData: WixSubmission): string {
+  // Try structured contact emails first
+  if (wixData.contact?.emails && Array.isArray(wixData.contact.emails) && wixData.contact.emails.length > 0) {
+    const email = wixData.contact.emails[0];
+    if (typeof email === 'string' && email.trim()) {
+      return email.trim();
+    }
+  }
+
+  // Try direct form field email patterns (field:email_xxxx format)
+  const emailFieldKeys = Object.keys(wixData).filter(key =>
+    key.startsWith('field:email') || key.toLowerCase().includes('email')
+  );
+
+  for (const key of emailFieldKeys) {
+    const email = String(wixData[key] || '').trim();
+    if (email && email.includes('@')) {
+      return email;
+    }
+  }
+
+  // Try form submissions
+  const submissions = wixData.submissions || [];
+  for (const submission of submissions) {
+    const value = submission.value || {};
+
+    for (const [key, val] of Object.entries(value)) {
+      const keyLower = key.toLowerCase();
+      if (keyLower.includes('email')) {
+        const email = String(val || '').trim();
+        if (email && email.includes('@')) {
+          return email;
+        }
+      }
+    }
+  }
+
+  return '';
+}
+
 export function extractNotes(wixData: WixSubmission): string {
   let notes: string[] = [];
 
@@ -421,6 +472,7 @@ export function normalizeWixData(wixData: WixSubmission): LeadData {
   const names = extractNames(wixData);
   const address = extractAddressComponents(wixData);
   const phone = extractPhone(wixData);
+  const email = extractEmail(wixData);
   const notes = extractNotes(wixData);
   const requestType = extractRequestType(wixData);
 
@@ -429,6 +481,7 @@ export function normalizeWixData(wixData: WixSubmission): LeadData {
     last_name: names.last_name,
     lead_full_name: names.lead_full_name,
     lead_phone: phone,
+    lead_email: email,
     address_line1: address.address_line1,
     city: address.city,
     state: address.state,
